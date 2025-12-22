@@ -57,3 +57,64 @@ export function loadTaskCompletion(): Record<string, boolean> {
   }
   return {};
 }
+
+// Custom Tasks Logic
+import { CustomTask, Role } from './types';
+const CUSTOM_TASKS_KEY = 'parenting_app_custom_tasks';
+
+export function loadCustomTasks(week: number, role: Role): CustomTask[] {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(CUSTOM_TASKS_KEY);
+    if (!stored) return [];
+    
+    const allTasks: CustomTask[] = JSON.parse(stored);
+    return allTasks
+      .filter(t => t.week === week && t.role === role)
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }
+  return [];
+}
+
+export function addCustomTask(week: number, role: Role, content: string): CustomTask {
+  const newTask: CustomTask = {
+    id: crypto.randomUUID(),
+    week,
+    role,
+    content,
+    isCompleted: false,
+    createdAt: Date.now(),
+  };
+
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(CUSTOM_TASKS_KEY);
+    const allTasks: CustomTask[] = stored ? JSON.parse(stored) : [];
+    allTasks.push(newTask);
+    localStorage.setItem(CUSTOM_TASKS_KEY, JSON.stringify(allTasks));
+  }
+  return newTask;
+}
+
+export function deleteCustomTask(id: string) {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(CUSTOM_TASKS_KEY);
+    if (stored) {
+      let allTasks: CustomTask[] = JSON.parse(stored);
+      allTasks = allTasks.filter(t => t.id !== id);
+      localStorage.setItem(CUSTOM_TASKS_KEY, JSON.stringify(allTasks));
+    }
+  }
+}
+
+export function toggleCustomTaskCompletion(id: string, isCompleted: boolean) {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(CUSTOM_TASKS_KEY);
+    if (stored) {
+      const allTasks: CustomTask[] = JSON.parse(stored);
+      const index = allTasks.findIndex(t => t.id === id);
+      if (index !== -1) {
+        allTasks[index].isCompleted = isCompleted;
+        localStorage.setItem(CUSTOM_TASKS_KEY, JSON.stringify(allTasks));
+      }
+    }
+  }
+}

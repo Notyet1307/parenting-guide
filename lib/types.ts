@@ -26,3 +26,12 @@ export interface WeeklyContent {
   tasks: WeeklyTasks;
   tips: string[];
 }
+
+export interface CustomTask {
+  id: string;
+  week: number;
+  role: Role;
+  content: string;
+  isCompleted: boolean;
+  createdAt: number;
+}

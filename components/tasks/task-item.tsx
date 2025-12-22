@@ -4,17 +4,21 @@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 
+import { Trash2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
 interface TaskItemProps {
   id: string;
   content: string;
   isCompleted: boolean;
   onToggle: (checked: boolean) => void;
+  onDelete?: () => void;
 }
 
-export function TaskItem({ id, content, isCompleted, onToggle }: TaskItemProps) {
+export function TaskItem({ id, content, isCompleted, onToggle, onDelete }: TaskItemProps) {
   return (
-    <div className={`flex items-top space-x-3 p-3 rounded-lg border transition-all ${
-      isCompleted ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200 hover:border-slate-300"
+    <div className={`group flex items-top space-x-3 p-3 rounded-lg border transition-all ${
+      isCompleted ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200 hover:border-purple-200 hover:shadow-sm"
     }`}>
       <Checkbox 
         id={id} 
@@ -22,16 +26,27 @@ export function TaskItem({ id, content, isCompleted, onToggle }: TaskItemProps) 
         onCheckedChange={(checked) => onToggle(checked === true)}
         className="mt-1"
       />
-      <div className="grid gap-1.5 leading-none">
+      <div className="flex-1 grid gap-1.5 leading-none">
         <Label 
           htmlFor={id} 
-          className={`text-sm font-medium leading-relaxed peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer ${
+          className={`text-sm font-medium leading-relaxed cursor-pointer transition-colors ${
             isCompleted ? "text-slate-400 line-through" : "text-slate-700"
           }`}
         >
           {content}
         </Label>
       </div>
+      
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity -mt-0.5 text-slate-400 hover:text-red-500 hover:bg-red-50"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
     </div>
   )
 }
