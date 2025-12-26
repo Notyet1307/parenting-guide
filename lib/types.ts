@@ -22,6 +22,7 @@ export interface WeeklyTasks {
 export interface WeeklyContent {
   week: number;
   babySize: string;
+  babySizeImage?: string;
   summary: string;
   tasks: WeeklyTasks;
   tips: string[];

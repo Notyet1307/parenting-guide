@@ -17,8 +17,18 @@ export default function Dashboard() {
   const [config, setConfig] = useState<UserConfig | null>(null)
   const [currentWeek, setCurrentWeek] = useState<number>(4)
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
+    // Check Supabase Auth
+    const checkAuth = async () => {
+      const { createClient } = await import("@/utils/supabase/client")
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    checkAuth()
+
     // Check if user is aboard
     const savedConfig = loadUserConfig()
     if (!savedConfig.role || !savedConfig.dueDate) {
@@ -37,6 +47,14 @@ export default function Dashboard() {
     
     setLoading(false)
   }, [router])
+
+  const handleLogout = async () => {
+    const { createClient } = await import("@/utils/supabase/client")
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setUser(null)
+    router.refresh()
+  }
 
   if (loading || !config) {
     return (
@@ -68,9 +86,20 @@ export default function Dashboard() {
             {config.nickname} · 距预产期还有 <span className="text-purple-600 font-bold">{40 - currentWeek}</span> 周
           </p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => router.push("/onboarding")} className="hover:bg-slate-100 rounded-full">
-          <Settings className="h-5 w-5 text-slate-400" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {user ? (
+             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs text-slate-500">
+               退出
+             </Button>
+          ) : (
+             <Button variant="ghost" size="sm" onClick={() => router.push('/login')} className="text-xs text-purple-600">
+               登录
+             </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => router.push("/onboarding")} className="hover:bg-slate-100 rounded-full">
+            <Settings className="h-5 w-5 text-slate-400" />
+          </Button>
+        </div>
       </header>
 
       <div className="p-4 max-w-md mx-auto space-y-6 relative z-10">

@@ -1,21 +1,13 @@
 // lib/data.ts
 
-export interface WeeklyContent {
-  week: number;
-  babySize: string; // e.g., "Seed", "Blueberry"
-  summary: string; // P0-1: 本周重点
-  tasks: {
-    dad: string[]; // P0-2: 准爸任务
-    mom: string[]; // P0-2: 准妈任务
-  };
-  tips: string[]; // P0-3: 知识卡片
-}
+import { WeeklyContent } from './types';
 
 export const weeklyData: WeeklyContent[] = [
   // --- First Trimester (Weeks 4-13) ---
   {
     week: 4,
     babySize: "罂粟籽 (Poppy Seed)",
+    babySizeImage: "/images/week-4-poppy-seed.svg",
     summary: "受精卵着床，你可能还没察觉，但生命已经开始。",
     tasks: {
       dad: [

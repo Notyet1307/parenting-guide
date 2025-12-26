@@ -9,6 +9,16 @@ interface BabyInfoCardProps {
 export function BabyInfoCard({ data }: BabyInfoCardProps) {
   return (
     <Card className="w-full bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 border-0 shadow-lg ring-1 ring-purple-100/50 overflow-hidden relative">
+      {data.babySizeImage && (
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={data.babySizeImage} 
+            alt={data.babySize}
+            className="w-full h-full object-cover opacity-15 mix-blend-multiply"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-50/50 via-purple-50/50 to-fuchsia-50/50" />
+        </div>
+      )}
       <div className="absolute top-0 right-0 w-24 h-24 bg-purple-200/20 rounded-full blur-2xl -mr-8 -mt-8 pointer-events-none" />
       <CardHeader className="pb-2 relative z-10">
         <div className="flex justify-between items-center">
