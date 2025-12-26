@@ -20,6 +20,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
 
+  // Partner State
+  const [partner, setPartner] = useState<{ id: string, nickname: string, role: string } | null>(null)
+  const [showPartnerTasks, setShowPartnerTasks] = useState(false)
+
   useEffect(() => {
     const init = async () => {
       // 1. Check Cloud Auth
@@ -33,6 +37,17 @@ export default function Dashboard() {
         const { getProfile, updateProfile } = await import("@/app/actions/profile")
         const profile = await getProfile()
         
+        // Fetch Partner Status
+        const { getPartnerStatus } = await import("@/app/actions/partner")
+        const partnerStatus = await getPartnerStatus()
+        if (partnerStatus) {
+            setPartner({ 
+                id: partnerStatus.partnerId, 
+                nickname: partnerStatus.nickname, 
+                role: partnerStatus.role 
+            })
+        }
+
         // Strategy: Cloud > Local > Onboarding
         if (profile && profile.role && profile.dueDate) {
           // Case A: Cloud has data -> Sync DOWN to Local & Show Dashboard
@@ -89,9 +104,6 @@ export default function Dashboard() {
     const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
-    // Clear config to force re-evaluation or showing welcome screen? 
-    // Actually, when logging out, we might want to keep local data or clear it? 
-    // For now, let's reload the page to restart the init flow
     window.location.reload()
   }
 
@@ -116,7 +128,11 @@ export default function Dashboard() {
     tips: []
   }
 
-  const currentRoleTasks = config?.role === 'dad' ? weeklyContent.tasks.dad : weeklyContent.tasks.mom
+  // Calculate stats
+  // Determine whose tasks to show
+  const isPartnerView = showPartnerTasks && partner;
+  const targetRole = isPartnerView ? (partner.role as 'dad' | 'mom') : config.role!;
+  const displayTasks = targetRole === 'dad' ? weeklyContent.tasks.dad : weeklyContent.tasks.mom
 
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20 font-sans selection:bg-purple-100">
@@ -158,18 +174,41 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
               <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
-              本周任务
+              {isPartnerView ? `${partner?.nickname}的任务` : "本周任务"}
             </h2>
-            <span className="text-xs bg-purple-50 text-purple-600 font-semibold px-2.5 py-1 rounded-full border border-purple-100">
-              {currentRoleTasks.length} 个待办
-            </span>
+            
+            <div className="flex items-center gap-2">
+                 {/* Partner Toggle */}
+                {partner && (
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg">
+                        <button 
+                            onClick={() => setShowPartnerTasks(false)}
+                            className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${!isPartnerView ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500'}`}
+                        >
+                            我
+                        </button>
+                        <button 
+                            onClick={() => setShowPartnerTasks(true)}
+                            className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${isPartnerView ? 'bg-white text-pink-600 shadow-sm' : 'text-slate-500'}`}
+                        >
+                            {partner.nickname}
+                        </button>
+                    </div>
+                )}
+                {!partner && (
+                     <span className="text-xs bg-purple-50 text-purple-600 font-semibold px-2.5 py-1 rounded-full border border-purple-100">
+                        {displayTasks.length} 个待办
+                    </span>
+                )}
+            </div>
           </div>
           
           <TaskList 
-            tasks={currentRoleTasks}
-            role={config.role!} 
+            tasks={displayTasks}
+            role={targetRole} 
             week={currentWeek}
             user={user}
+            viewingUserId={isPartnerView ? partner?.id : undefined}
           />
         </section>
 

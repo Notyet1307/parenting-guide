@@ -14,20 +14,27 @@ interface TaskListProps {
   tasks: string[];
   role: Role;
   week: number;
+  user?: any;
+  viewingUserId?: string; // New prop for finding whose tasks we are loading
 }
 
-export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: any }) {
+export function TaskList({ tasks, role, week, user, viewingUserId }: TaskListProps) {
   const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
   const [newTaskContent, setNewTaskContent] = useState("");
 
+  // Target ID: if viewingUserId provided, use it. Else use current user's ID (if logged in).
+  // If no viewingUserId and no user (offline), it doesn't matter (local storage).
+  const targetId = viewingUserId || user?.id
+
   // Load Data
   useEffect(() => {
-    if (user) {
-      // Logged in: Load from Supabase
+    if (user && targetId) {
+      // Logged in: Load from Supabase using targetId
       const fetchTasks = async () => {
          const { getTasks } = await import("@/app/actions/tasks")
-         const { system, custom } = await getTasks(week)
+         // Pass targetId to getTasks
+         const { system, custom } = await getTasks(week, targetId)
          
          // Convert system tasks map
          const sysMap: Record<string, boolean> = {}
@@ -40,7 +47,7 @@ export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: a
          setCustomTasks(custom.map((t: any) => ({
            id: t.id,
            week: t.week,
-           role: role, // Assuming role filter isn't strict for custom tasks stored in DB currently, or we can filter
+           role: role, 
            content: t.content,
            isCompleted: t.is_completed,
            createdAt: t.created_at
@@ -48,11 +55,11 @@ export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: a
       }
       fetchTasks()
     } else {
-      // Guest: Load from LocalStorage
+      // Guest: Load from LocalStorage (Always self)
       setCompletedMap(loadTaskCompletion());
       setCustomTasks(loadCustomTasks(week, role));
     }
-  }, [week, role, user]);
+  }, [week, role, user, targetId]);
 
   const handleSystemToggle = async (taskIndex: number, checked: boolean) => {
     const taskId = `w${week}-${role}-${taskIndex}`;
@@ -61,10 +68,10 @@ export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: a
     const newMap = { ...completedMap, [taskId]: checked };
     setCompletedMap(newMap);
     
-    if (user) {
+    if (user && targetId) {
        // Sync to Supabase
        const { toggleSystemTask } = await import("@/app/actions/tasks")
-       await toggleSystemTask(taskId, checked, week)
+       await toggleSystemTask(taskId, checked, week, targetId)
     } else {
        // Sync to LocalStorage
        saveTaskCompletion(taskId, checked);
@@ -74,16 +81,13 @@ export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: a
   const handleAddCustomTask = async () => {
     if (!newTaskContent.trim()) return;
 
-    if (user) {
+    if (user && targetId) {
       // Supabase
       const { addCustomTask: addAction } = await import("@/app/actions/tasks")
-      await addAction(newTaskContent.trim(), week)
-      // Re-fetch or simplistic refresh. For smooth UX, better to re-fetch or append optimistic
-      // Let's just trigger a re-fetch or waiting for server action revalidatePath might auto-refresh this if it was a server component.
-      // Since this is client component state, we need to manually update or re-fetch.
-      // Re-fetching is easier for consistency.
+      await addAction(newTaskContent.trim(), week, targetId)
+      
       const { getTasks } = await import("@/app/actions/tasks")
-      const { custom } = await getTasks(week)
+      const { custom } = await getTasks(week, targetId)
       setCustomTasks(custom.map((t: any) => ({
            id: t.id,
            week: t.week,
