@@ -3,12 +3,13 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { loadUserConfig, calculateCurrentWeek } from "@/lib/store"
+import { loadUserConfig, saveUserConfig, calculateCurrentWeek } from "@/lib/store"
 import { UserConfig } from "@/lib/types"
 import { getWeeklyData } from "@/lib/data"
 import { WeekSlider } from "@/components/timeline/week-slider"
 import { BabyInfoCard } from "@/components/timeline/baby-info-card"
 import { TaskList } from "@/components/tasks/task-list"
+import { WelcomeScreen } from "@/components/welcome-screen"
 import { Button } from "@/components/ui/button"
 import { Settings } from "lucide-react"
 
@@ -20,32 +21,67 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    // Check Supabase Auth
-    const checkAuth = async () => {
+    const init = async () => {
+      // 1. Check Cloud Auth
       const { createClient } = await import("@/utils/supabase/client")
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      
+      if (user) {
+        setUser(user)
+        // Fetch Cloud Profile
+        const { getProfile, updateProfile } = await import("@/app/actions/profile")
+        const profile = await getProfile()
+        
+        // Strategy: Cloud > Local > Onboarding
+        if (profile && profile.role && profile.dueDate) {
+          // Case A: Cloud has data -> Sync DOWN to Local & Show Dashboard
+          saveUserConfig(profile) 
+          setConfig(profile)
+          
+          if (profile.dueDate) {
+             const week = calculateCurrentWeek(profile.dueDate)
+             setCurrentWeek(week)
+           }
+        } else {
+          // Case B: Cloud empty. Check Local.
+          const localConfig = loadUserConfig()
+          if (localConfig.role && localConfig.dueDate) {
+            // Case B1: Has Local Data (Legacy/Phase 1 User) -> Sync UP to Cloud & Show Dashboard
+            console.log("Syncing local data to cloud...")
+            setConfig(localConfig) // Show immediately for speed
+            
+            // Sync in background
+            await updateProfile(localConfig)
+            
+            if (localConfig.dueDate) {
+               const week = calculateCurrentWeek(localConfig.dueDate)
+               setCurrentWeek(week)
+            }
+          } else {
+            // Case B2: No Cloud, No Local -> Go to Onboarding
+             router.push("/onboarding")
+             return
+          }
+        }
+      } else {
+        // No Cloud Auth -> Check Local Storage
+        const savedConfig = loadUserConfig()
+        if (savedConfig.role && savedConfig.dueDate) {
+           // Offline User -> Show Dashboard
+           setConfig(savedConfig)
+           if (savedConfig.dueDate) {
+             const week = calculateCurrentWeek(savedConfig.dueDate)
+             setCurrentWeek(week)
+           }
+        } else {
+           // New User -> Show Welcome Screen
+           // Do nothing, config stays null, render WelcomeScreen
+        }
+      }
+      setLoading(false)
     }
-    checkAuth()
-
-    // Check if user is aboard
-    const savedConfig = loadUserConfig()
-    if (!savedConfig.role || !savedConfig.dueDate) {
-      router.push("/onboarding")
-      return
-    }
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setConfig(savedConfig)
-    
-    // Calculate current week based on due date
-    if (savedConfig.dueDate) {
-      const week = calculateCurrentWeek(savedConfig.dueDate)
-      setCurrentWeek(week)
-    }
-    
-    setLoading(false)
+    init()
   }, [router])
 
   const handleLogout = async () => {
@@ -53,15 +89,23 @@ export default function Dashboard() {
     const supabase = createClient()
     await supabase.auth.signOut()
     setUser(null)
-    router.refresh()
+    // Clear config to force re-evaluation or showing welcome screen? 
+    // Actually, when logging out, we might want to keep local data or clear it? 
+    // For now, let's reload the page to restart the init flow
+    window.location.reload()
   }
 
-  if (loading || !config) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-slate-400">Loading...</div>
       </div>
     )
+  }
+
+  // If no config found (and not loading), show Welcome Screen
+  if (!config) {
+    return <WelcomeScreen />
   }
 
   const weeklyContent = getWeeklyData(currentWeek) || {
@@ -72,7 +116,7 @@ export default function Dashboard() {
     tips: []
   }
 
-  const currentRoleTasks = config.role === 'dad' ? weeklyContent.tasks.dad : weeklyContent.tasks.mom
+  const currentRoleTasks = config?.role === 'dad' ? weeklyContent.tasks.dad : weeklyContent.tasks.mom
 
   return (
     <main className="min-h-screen bg-slate-50/50 pb-20 font-sans selection:bg-purple-100">
