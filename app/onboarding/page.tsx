@@ -15,14 +15,25 @@ export default function OnboardingPage() {
   const [role, setRole] = useState<Role | null>(null)
   const [dueDate, setDueDate] = useState("")
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!role || !dueDate) return
 
-    saveUserConfig({ 
+    const config = { 
       role, 
       dueDate, 
       nickname: role === 'dad' ? '准爸爸' : '准妈妈' 
-    })
+    }
+
+    // 1. Save to LocalStorage (Immediate & Fallback)
+    saveUserConfig(config)
+
+    // 2. Try to save to Supabase (if logged in)
+    try {
+      const { updateProfile } = await import("@/app/actions/profile")
+      await updateProfile(config)
+    } catch (e) {
+      console.log("Not logged in or sync failed, using local storage only")
+    }
 
     // 跳转回首页，首页会检测 config 并显示 Dashboard
     router.push("/")

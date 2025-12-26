@@ -125,6 +125,7 @@ export default function Dashboard() {
             tasks={currentRoleTasks}
             role={config.role!} 
             week={currentWeek}
+            user={user}
           />
         </section>
 

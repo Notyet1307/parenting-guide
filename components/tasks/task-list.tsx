@@ -16,45 +16,114 @@ interface TaskListProps {
   week: number;
 }
 
-export function TaskList({ tasks, role, week }: TaskListProps) {
+export function TaskList({ tasks, role, week, user }: TaskListProps & { user?: any }) {
   const [completedMap, setCompletedMap] = useState<Record<string, boolean>>({});
   const [customTasks, setCustomTasks] = useState<CustomTask[]>([]);
   const [newTaskContent, setNewTaskContent] = useState("");
 
-  // Load System Task Completion
+  // Load Data
   useEffect(() => {
-    setCompletedMap(loadTaskCompletion());
-  }, []);
+    if (user) {
+      // Logged in: Load from Supabase
+      const fetchTasks = async () => {
+         const { getTasks } = await import("@/app/actions/tasks")
+         const { system, custom } = await getTasks(week)
+         
+         // Convert system tasks map
+         const sysMap: Record<string, boolean> = {}
+         system.forEach((t: any) => {
+           sysMap[t.task_id] = t.is_completed
+         })
+         setCompletedMap(sysMap)
 
-  // Load Custom Tasks when week/role changes
-  useEffect(() => {
-    setCustomTasks(loadCustomTasks(week, role));
-  }, [week, role]);
+         // Convert custom tasks
+         setCustomTasks(custom.map((t: any) => ({
+           id: t.id,
+           week: t.week,
+           role: role, // Assuming role filter isn't strict for custom tasks stored in DB currently, or we can filter
+           content: t.content,
+           isCompleted: t.is_completed,
+           createdAt: t.created_at
+         })))
+      }
+      fetchTasks()
+    } else {
+      // Guest: Load from LocalStorage
+      setCompletedMap(loadTaskCompletion());
+      setCustomTasks(loadCustomTasks(week, role));
+    }
+  }, [week, role, user]);
 
-  const handleSystemToggle = (taskIndex: number, checked: boolean) => {
+  const handleSystemToggle = async (taskIndex: number, checked: boolean) => {
     const taskId = `w${week}-${role}-${taskIndex}`;
+    
+    // Optimistic Update
     const newMap = { ...completedMap, [taskId]: checked };
     setCompletedMap(newMap);
-    saveTaskCompletion(taskId, checked);
+    
+    if (user) {
+       // Sync to Supabase
+       const { toggleSystemTask } = await import("@/app/actions/tasks")
+       await toggleSystemTask(taskId, checked, week)
+    } else {
+       // Sync to LocalStorage
+       saveTaskCompletion(taskId, checked);
+    }
   };
 
-  const handleAddCustomTask = () => {
+  const handleAddCustomTask = async () => {
     if (!newTaskContent.trim()) return;
-    const task = addCustomTask(week, role, newTaskContent.trim());
-    setCustomTasks([...customTasks, task]);
+
+    if (user) {
+      // Supabase
+      const { addCustomTask: addAction } = await import("@/app/actions/tasks")
+      await addAction(newTaskContent.trim(), week)
+      // Re-fetch or simplistic refresh. For smooth UX, better to re-fetch or append optimistic
+      // Let's just trigger a re-fetch or waiting for server action revalidatePath might auto-refresh this if it was a server component.
+      // Since this is client component state, we need to manually update or re-fetch.
+      // Re-fetching is easier for consistency.
+      const { getTasks } = await import("@/app/actions/tasks")
+      const { custom } = await getTasks(week)
+      setCustomTasks(custom.map((t: any) => ({
+           id: t.id,
+           week: t.week,
+           role: role,
+           content: t.content,
+           isCompleted: t.is_completed,
+           createdAt: t.created_at
+      })))
+    } else {
+      // LocalStorage
+      const task = addCustomTask(week, role, newTaskContent.trim());
+      setCustomTasks([...customTasks, task]);
+    }
     setNewTaskContent("");
   };
 
-  const handleDeleteCustomTask = (id: string) => {
-    deleteCustomTask(id);
+  const handleDeleteCustomTask = async (id: string) => {
+    // Optimistic
     setCustomTasks(customTasks.filter(t => t.id !== id));
+
+    if (user) {
+      const { deleteCustomTask: deleteAction } = await import("@/app/actions/tasks")
+      await deleteAction(id)
+    } else {
+      deleteCustomTask(id);
+    }
   };
 
-  const handleCustomToggle = (id: string, checked: boolean) => {
-    toggleCustomTaskCompletion(id, checked);
+  const handleCustomToggle = async (id: string, checked: boolean) => {
+    // Optimistic
     setCustomTasks(customTasks.map(t => 
       t.id === id ? { ...t, isCompleted: checked } : t
     ));
+
+    if (user) {
+      const { toggleCustomTask: toggleAction } = await import("@/app/actions/tasks")
+      await toggleAction(id, checked)
+    } else {
+      toggleCustomTaskCompletion(id, checked);
+    }
   };
 
   return (
